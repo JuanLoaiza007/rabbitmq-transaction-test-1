@@ -26,9 +26,11 @@ let creditCardBalance = 500; // Total disponible
   const channel = await connection.createChannel();
   const paymentQueue = "payment_queue";
   const informationQueue = "information_queue";
+  const stockCompensationQueue = "stock_compensation_queue"; // Cola de compensaciones
 
   await channel.assertQueue(paymentQueue, { durable: false });
   await channel.assertQueue(informationQueue, { durable: false });
+  await channel.assertQueue(stockCompensationQueue, { durable: false });
 
   channel.consume(paymentQueue, async (msg) => {
     const { productId, quantity, totalPrice } = JSON.parse(
@@ -53,11 +55,12 @@ let creditCardBalance = 500; // Total disponible
       console.error("Insufficient funds for payment");
       // Enviar compensación a Stock
       channel.sendToQueue(
-        paymentQueue,
+        stockCompensationQueue,
         Buffer.from(
           JSON.stringify({ productId, quantity, totalPrice, refund: true })
         )
       );
+      // TODO: notificacion a order
     }
   });
 })();

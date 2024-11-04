@@ -1,41 +1,64 @@
 import { connect } from "amqplib";
-import express from "express";
+import http from "http";
 
-const app = express();
-app.use(express.json());
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let delay = 10000;
+let retries = 3;
 
-const orderQueue = "order_to_stock";
-
-async function sendMessage(queue, message) {
-  const connection = await connect("amqp://user:password@rabbitmq");
-  const channel = await connection.createChannel();
-  await channel.assertQueue(queue, { durable: false });
-  channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)));
-  console.log(`[Order] Sent order to ${queue}:`, message);
+async function connectWithRetry(url) {
+  while (retries) {
+    try {
+      const connection = await connect(url);
+      console.log("Connected to RabbitMQ");
+      return connection;
+    } catch (err) {
+      console.error(`Error connecting to RabbitMQ: ${err}. Retrying...`);
+      retries -= 1;
+      await wait(delay);
+    }
+  }
+  throw new Error("Failed to connect to RabbitMQ after several attempts");
 }
 
-app.post("/order", async (req, res) => {
-  const { productId, quantity } = req.body;
-  if (!productId || !quantity) {
-    return res
-      .status(400)
-      .json({ error: "Product ID and quantity are required" });
-  }
+(async () => {
+  const connection = await connectWithRetry("amqp://user:password@rabbitmq");
+  const channel = await connection.createChannel();
+  const orderQueue = "order_queue";
 
-  const order = {
-    orderId: new Date().getTime(),
-    productId,
-    quantity,
-    status: "pending",
-  };
+  await channel.assertQueue(orderQueue, { durable: false });
 
-  try {
-    await sendMessage(orderQueue, order);
-    res.status(200).json({ message: "Order sent to stock service" });
-  } catch (error) {
-    console.error("[Order] Error sending order:", error);
-    res.status(500).json({ error: "Failed to send order" });
-  }
-});
+  const server = http.createServer((req, res) => {
+    let body = "";
 
-app.listen(3000, () => console.log("Order service listening on port 3000"));
+    if (req.method === "POST") {
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on("end", () => {
+        const { productId, quantity } = JSON.parse(body);
+
+        if (typeof productId !== "number" || typeof quantity !== "number") {
+          res.writeHead(400);
+          res.end("Invalid input");
+          return;
+        }
+
+        channel.sendToQueue(
+          orderQueue,
+          Buffer.from(JSON.stringify({ productId, quantity }))
+        );
+        console.log(`Order sent: ${JSON.stringify({ productId, quantity })}`);
+        res.writeHead(200);
+        res.end("Order sent to stock");
+      });
+    } else {
+      res.writeHead(405);
+      res.end("Method Not Allowed");
+    }
+  });
+
+  server.listen(3000, () => {
+    console.log("Order service is listening on port 3000");
+  });
+})();

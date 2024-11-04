@@ -1,50 +1,63 @@
 import { connect } from "amqplib";
 
-const paymentQueue = "stock_to_payment";
-const informationQueue = "payment_to_information";
-const compensationQueue = "compensate_payment";
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let delay = 10000;
+let retries = 3;
 
-let creditCardBalance = 1000;
-
-async function sendMessage(queue, message) {
-  const connection = await connect("amqp://user:password@rabbitmq");
-  const channel = await connection.createChannel();
-  await channel.assertQueue(queue, { durable: false });
-  channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)));
-}
-
-async function processPayment(msg) {
-  const order = JSON.parse(msg.content.toString());
-  const productCost = order.quantity * products[order.productId].price;
-
-  if (creditCardBalance >= productCost) {
-    creditCardBalance -= productCost;
-    console.log(
-      `[Payment] Payment processed. New balance: $${creditCardBalance}`
-    );
-
+async function connectWithRetry(url) {
+  while (retries) {
     try {
-      await sendMessage(informationQueue, order);
-    } catch (error) {
-      console.error("[Payment] Failed to send to information, compensating...");
-      creditCardBalance += productCost;
-      await sendMessage(compensationQueue, {
-        ...order,
-        status: "failed_payment",
-      });
+      const connection = await connect(url);
+      console.log("Connected to RabbitMQ");
+      return connection;
+    } catch (err) {
+      console.error(`Error connecting to RabbitMQ: ${err}. Retrying...`);
+      retries -= 1;
+      await wait(delay);
     }
-  } else {
-    console.error("[Payment] Insufficient balance, sending failure message...");
-    await sendMessage(compensationQueue, {
-      ...order,
-      status: "failed_payment",
-    });
   }
+  throw new Error("Failed to connect to RabbitMQ after several attempts");
 }
+
+let creditCardBalance = 500; // Total disponible
 
 (async () => {
-  const connection = await connect("amqp://user:password@rabbitmq");
+  const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
+  const paymentQueue = "payment_queue";
+  const informationQueue = "information_queue";
+
   await channel.assertQueue(paymentQueue, { durable: false });
-  await channel.consume(paymentQueue, processPayment, { noAck: true });
+  await channel.assertQueue(informationQueue, { durable: false });
+
+  channel.consume(paymentQueue, async (msg) => {
+    const { productId, quantity, totalPrice } = JSON.parse(
+      msg.content.toString()
+    );
+    console.log(
+      `Payment processing order: ${JSON.stringify({
+        productId,
+        quantity,
+        totalPrice,
+      })}`
+    );
+
+    if (creditCardBalance >= totalPrice) {
+      creditCardBalance -= totalPrice;
+      console.log(`Payment successful. New balance: ${creditCardBalance}`);
+      channel.sendToQueue(
+        informationQueue,
+        Buffer.from(JSON.stringify({ status: "success", productId, quantity }))
+      );
+    } else {
+      console.error("Insufficient funds for payment");
+      // Enviar compensación a Stock
+      channel.sendToQueue(
+        paymentQueue,
+        Buffer.from(
+          JSON.stringify({ productId, quantity, totalPrice, refund: true })
+        )
+      );
+    }
+  });
 })();

@@ -1,53 +1,58 @@
 import { connect } from "amqplib";
 
-const stockQueue = "order_to_stock";
-const paymentQueue = "stock_to_payment";
-const compensationQueue = "compensate_stock";
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let delay = 10000;
+let retries = 3;
+
+async function connectWithRetry(url) {
+  while (retries) {
+    try {
+      const connection = await connect(url);
+      console.log("Connected to RabbitMQ");
+      return connection;
+    } catch (err) {
+      console.error(`Error connecting to RabbitMQ: ${err}. Retrying...`);
+      retries -= 1;
+      await wait(delay);
+    }
+  }
+  throw new Error("Failed to connect to RabbitMQ after several attempts");
+}
 
 const products = {
-  1: { quantity: 10, price: 100 },
-  2: { quantity: 5, price: 200 },
-  3: { quantity: 2, price: 300 },
+  1: { stock: 10, price: 100 },
+  2: { stock: 5, price: 200 },
+  3: { stock: 0, price: 300 },
 };
 
-async function sendMessage(queue, message) {
-  const connection = await connect("amqp://user:password@rabbitmq");
-  const channel = await connection.createChannel();
-  await channel.assertQueue(queue, { durable: false });
-  channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)));
-}
-
-async function processOrder(msg) {
-  const order = JSON.parse(msg.content.toString());
-  const product = products[order.productId];
-
-  if (product && product.quantity >= order.quantity) {
-    // Descontar stock
-    product.quantity -= order.quantity;
-    console.log(`[Stock] Stock updated:`, products);
-
-    try {
-      await sendMessage(paymentQueue, order);
-    } catch (error) {
-      console.error("[Stock] Failed to send order to payment, compensating...");
-      // Compensación: Reasignar stock
-      product.quantity += order.quantity;
-      await sendMessage(compensationQueue, {
-        ...order,
-        status: "failed_stock",
-      });
-    }
-  } else {
-    console.error(
-      "[Stock] Insufficient stock, sending failure message to order..."
-    );
-    await sendMessage(compensationQueue, { ...order, status: "failed_stock" });
-  }
-}
-
 (async () => {
-  const connection = await connect("amqp://user:password@rabbitmq");
+  const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  await channel.assertQueue(stockQueue, { durable: false });
-  await channel.consume(stockQueue, processOrder, { noAck: true });
+  const orderQueue = "order_queue";
+  const paymentQueue = "payment_queue";
+
+  await channel.assertQueue(orderQueue, { durable: false });
+  await channel.assertQueue(paymentQueue, { durable: false });
+
+  channel.consume(orderQueue, async (msg) => {
+    const { productId, quantity } = JSON.parse(msg.content.toString());
+    console.log(
+      `Stock received order: ${JSON.stringify({ productId, quantity })}`
+    );
+
+    if (products[productId].stock >= quantity) {
+      products[productId].stock -= quantity;
+      console.log(
+        `Stock updated for product ${productId}: ${products[productId].stock}`
+      );
+
+      const totalPrice = products[productId].price * quantity;
+      channel.sendToQueue(
+        paymentQueue,
+        Buffer.from(JSON.stringify({ productId, quantity, totalPrice }))
+      );
+    } else {
+      console.error("Insufficient stock");
+    }
+  });
 })();

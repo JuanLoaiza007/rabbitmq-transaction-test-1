@@ -22,9 +22,8 @@ async function connectWithRetry(url) {
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const informationQueue = "information_queue";
-
-  await channel.assertQueue(informationQueue, { durable: false });
+  const informationQueue = "information_queue"; // my queue
+  const paymentCompensationQueue = "payment_compensation_queue"; // last service compensation queue
 
   channel.consume(informationQueue, async (msg) => {
     const { status, productId, quantity } = JSON.parse(msg.content.toString());

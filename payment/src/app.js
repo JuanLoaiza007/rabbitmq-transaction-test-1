@@ -24,13 +24,10 @@ let creditCardBalance = 500; // Total disponible
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const paymentQueue = "payment_queue";
-  const informationQueue = "information_queue";
-  const stockCompensationQueue = "stock_compensation_queue"; // Cola de compensaciones
-
-  await channel.assertQueue(paymentQueue, { durable: false });
-  await channel.assertQueue(informationQueue, { durable: false });
-  await channel.assertQueue(stockCompensationQueue, { durable: false });
+  const paymentQueue = "payment_queue"; // my queue
+  const informationQueue = "information_queue"; // next queue
+  const stockCompensationQueue = "stock_compensation_queue"; // last service compensation queue
+  const paymentCompensationQueue = "payment_compensation_queue"; // my compensation queue
 
   channel.consume(paymentQueue, async (msg) => {
     const { productId, quantity, totalPrice } = JSON.parse(
@@ -60,7 +57,11 @@ let creditCardBalance = 500; // Total disponible
           JSON.stringify({ productId, quantity, totalPrice, refund: true })
         )
       );
-      // TODO: notificacion a order
     }
   });
+
+  // TODO: Accion compensatoria de payment
+  // channel.consume(paymentCompensationQueue, async (msg) => {
+  //   // TODO: Logica adicional para informar a order
+  // });
 })();

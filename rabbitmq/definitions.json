@@ -1,0 +1,31 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "queues": [
+    {
+      "name": "stock_queue",
+      "vhost": "/"
+    },
+    {
+      "name": "payment_queue",
+      "vhost": "/"
+    },
+    {
+      "name": "information_queue",
+      "vhost": "/"
+    },
+    {
+      "name": "stock_compensation_queue",
+      "vhost": "/"
+    },
+    {
+      "name": "payment_compensation_queue",
+      "vhost": "/"
+    }
+  ],
+  "exchanges": [],
+  "bindings": []
+}

@@ -23,9 +23,7 @@ async function connectWithRetry(url) {
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const orderQueue = "order_queue";
-
-  await channel.assertQueue(orderQueue, { durable: false });
+  const stockQueue = "stock_queue"; // next queue
 
   const server = http.createServer((req, res) => {
     let body = "";
@@ -45,7 +43,7 @@ async function connectWithRetry(url) {
         }
 
         channel.sendToQueue(
-          orderQueue,
+          stockQueue,
           Buffer.from(JSON.stringify({ productId, quantity }))
         );
         console.log(`Order sent: ${JSON.stringify({ productId, quantity })}`);

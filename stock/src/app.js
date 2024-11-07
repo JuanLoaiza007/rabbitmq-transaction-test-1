@@ -28,15 +28,11 @@ let productStock = {
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const orderQueue = "order_queue";
-  const paymentQueue = "payment_queue";
-  const paymentCompensationQueue = "stock_compensation_queue"; // Cola de compensación
+  const stockQueue = "stock_queue"; // my queue
+  const paymentQueue = "payment_queue"; // next queue
+  const stockCompensationQueue = "stock_compensation_queue"; // my compensation queue
 
-  await channel.assertQueue(paymentQueue, { durable: false });
-  await channel.assertQueue(orderQueue, { durable: false });
-  await channel.assertQueue(paymentCompensationQueue, { durable: false });
-
-  channel.consume(orderQueue, async (msg) => {
+  channel.consume(stockQueue, async (msg) => {
     const { productId, quantity } = JSON.parse(msg.content.toString());
     console.log(
       `Stock processing order: ${JSON.stringify({ productId, quantity })}`
@@ -65,7 +61,7 @@ let productStock = {
   });
 
   // Consumir de la cola de compensación
-  channel.consume(paymentCompensationQueue, async (msg) => {
+  channel.consume(stockCompensationQueue, async (msg) => {
     const { productId, quantity } = JSON.parse(msg.content.toString());
     console.log(
       `Restoring stock for productId: ${productId}, quantity: ${quantity}`

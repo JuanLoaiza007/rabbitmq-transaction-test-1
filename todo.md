@@ -1,0 +1,3 @@
+- Reparar despliegue de RabbitMQ para que los puertos funcionen.
+- Implementar espera a que el contenedor de RabbitMQ este en estado Running.
+- Verificar funcionamiento de los demás servicios.

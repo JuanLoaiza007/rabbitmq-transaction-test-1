@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-deployment
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: juanloaiza007/rabbitmq-transaction-rabbitmq:latest
+          ports:
+            - containerPort: 5672 # AMQP
+            - containerPort: 15672 # Interfaz de administración HTTP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-service
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp-port # Nombre del puerto AMQP
+      protocol: TCP
+      port: 5672 # Exponer AMQP
+      targetPort: 30080 # Target en el contenedor
+    - name: http-port # Nombre del puerto HTTP
+      protocol: TCP
+      port: 15672 # Exponer interfaz HTTP
+      targetPort: 30081 # Target en el contenedor
+  type: ClusterIP

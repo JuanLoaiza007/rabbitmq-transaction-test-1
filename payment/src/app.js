@@ -24,10 +24,10 @@ let creditCardBalance = 500; // Total disponible
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const paymentQueue = "payment_queue"; // my queue
-  const informationQueue = "information_queue"; // next queue
-  const stockCompensationQueue = "stock_compensation_queue"; // last service compensation queue
-  const paymentCompensationQueue = "payment_compensation_queue"; // my compensation queue
+  const paymentQueue = "buy_process.payment_queue"; // my queue
+  const informationQueue = "buy_process.information_queue"; // next queue
+  const stockCompensationQueue = "buy_process.stock_compensation_queue"; // last service compensation queue
+  const paymentCompensationQueue = "buy_process.payment_compensation_queue"; // my compensation queue
 
   channel.consume(paymentQueue, async (msg) => {
     const { productId, quantity, totalPrice } = JSON.parse(

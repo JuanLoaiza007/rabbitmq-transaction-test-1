@@ -23,7 +23,7 @@ async function connectWithRetry(url) {
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const stockQueue = "stock_queue"; // next queue
+  const stockQueue = "buy_process.stock_queue"; // next queue
 
   const server = http.createServer((req, res) => {
     let body = "";

@@ -28,9 +28,9 @@ let productStock = {
 (async () => {
   const connection = await connectWithRetry("amqp://user:password@rabbitmq");
   const channel = await connection.createChannel();
-  const stockQueue = "stock_queue"; // my queue
-  const paymentQueue = "payment_queue"; // next queue
-  const stockCompensationQueue = "stock_compensation_queue"; // my compensation queue
+  const stockQueue = "buy_process.stock_queue"; // my queue
+  const paymentQueue = "buy_process.payment_queue"; // next queue
+  const stockCompensationQueue = "buy_process.stock_compensation_queue"; // my compensation queue
 
   channel.consume(stockQueue, async (msg) => {
     const { productId, quantity } = JSON.parse(msg.content.toString());

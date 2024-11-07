@@ -4,6 +4,9 @@ services:
   rabbitmq:
     build:
       context: ./rabbitmq
+    environment:
+      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
+      - RABBITMQ_ENABLED_PLUGINS_FILE=/etc/rabbitmq/enabled_plugins
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -24,18 +27,18 @@ services:
     ports:
       - "3001:3001"
 
-  # payment:
-  #   build:
-  #     context: ./payment
-  #   depends_on:
-  #     - rabbitmq
-  #   ports:
-  #     - "3002:3002"
+  payment:
+    build:
+      context: ./payment
+    depends_on:
+      - rabbitmq
+    ports:
+      - "3002:3002"
 
-  # information:
-  #   build:
-  #     context: ./information
-  #   depends_on:
-  #     - rabbitmq
-  #   ports:
-  #     - "3003:3003"
+  information:
+    build:
+      context: ./information
+    depends_on:
+      - rabbitmq
+    ports:
+      - "3003:3003"

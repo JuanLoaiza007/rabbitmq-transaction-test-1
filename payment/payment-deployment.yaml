@@ -19,6 +19,9 @@ spec:
           image: juanloaiza007/rabbitmq-transaction-payment:latest
           ports:
             - containerPort: 80
+          env:
+            - name: RABBITMQ_HOST
+              value: "rabbit.rabbitmq-system.svc.cluster.local"
 ---
 apiVersion: v1
 kind: Service

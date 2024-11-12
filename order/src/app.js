@@ -5,6 +5,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let delay = 10000;
 let retries = 3;
 
+const rabbitHost = process.env.RABBITMQ_HOST || "rabbitmq";
+
 async function connectWithRetry(url) {
   while (retries) {
     try {
@@ -21,7 +23,9 @@ async function connectWithRetry(url) {
 }
 
 (async () => {
-  const connection = await connectWithRetry("amqp://user:password@rabbitmq");
+  const connection = await connectWithRetry(
+    `amqp://user:password@${rabbitHost}`
+  );
   const channel = await connection.createChannel();
   const stockQueue = "buy_process.stock_queue"; // next queue
 

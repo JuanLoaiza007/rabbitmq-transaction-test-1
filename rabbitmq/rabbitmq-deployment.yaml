@@ -1,40 +1,26 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
 metadata:
-  name: rabbitmq-deployment
-  labels:
-    app: rabbitmq
+  name: rabbit
+  namespace: rabbitmq-system
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: rabbitmq
-  template:
-    metadata:
-      labels:
-        app: rabbitmq
-    spec:
-      containers:
-        - name: rabbitmq
-          image: juanloaiza007/rabbitmq-transaction-rabbitmq:latest
-          ports:
-            - containerPort: 5672 # AMQP
-            - containerPort: 15672 # Interfaz de administración HTTP
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: rabbitmq-service
-spec:
-  selector:
-    app: rabbitmq
-  ports:
-    - name: amqp-port # Nombre del puerto AMQP
-      protocol: TCP
-      port: 5672 # Exponer AMQP
-      targetPort: 30080 # Target en el contenedor
-    - name: http-port # Nombre del puerto HTTP
-      protocol: TCP
-      port: 15672 # Exponer interfaz HTTP
-      targetPort: 30081 # Target en el contenedor
-  type: ClusterIP
+  image: rabbitmq:4.0.3-management-alpine
+  override:
+    statefulSet:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: rabbitmq
+                volumeMounts:
+                  - mountPath: /etc/rabbitmq/definitions.json
+                    subPath: definitions.json # Name of the ConfigMap field containing definitions
+                    name: definitions
+            volumes:
+              - name: definitions
+                configMap:
+                  name: definitions # Name of the ConfigMap which contains definitions you wish to import
+  rabbitmq:
+    additionalConfig: |
+      load_definitions = /etc/rabbitmq/definitions.json # Path to the mounted definitions file

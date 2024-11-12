@@ -1,25 +1,52 @@
-#!/bin/bash
 
-# Crear el cluster de k3d
-echo "Creando el cluster de k3d..."
 k3d cluster create mycluster --agents 1 \
-  -p "5672:30080@agent:0" \
-  -p "15672:30081@agent:0" \
-  -p "3000:30082@agent:0" 
+  -p "3000:30081@agent:0"
 
-# Aplicar los despliegues
-echo "Aplicando despliegues..."
+# Delete  with
+# k3d cluster delete mycluster
 
-echo "Aplicando despliegue de rabbitmq"
+# Apply operator
+kubectl apply -f https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml
+
+# Check if the operator is running
+# kubectl -n rabbitmq-system get all
+
+# Delete content
+# kubectl -n rabbitmq-system delete all --all
+# Delete namespace
+# kubectl delete namespace rabbitmq-system
+
+# Create configmap
+kubectl create configmap definitions --from-file=rabbitmq/definitions.json -n rabbitmq-system
+# Deploy the RabbitMQ cluster
 kubectl apply -f rabbitmq/rabbitmq-deployment.yaml
 
-# echo "Esperando a que RabbitMQ esté en estado Running..."
-# kubectl wait --for=condition=ready pod -l app=rabbitmq --timeout=600s
+# Delete deployment
+# kubectl delete RabbitmqCluster rabbit -n rabbitmq-system
+# or
+# kubectl delete -f rabbitmq/rabbitmq-deployment.yaml
 
-# echo "Aplicando despliegues dependientes de rabbitmq"
-# kubectl apply -f order/order-deployment.yaml
-# kubectl apply -f stock/stock-deployment.yaml
-# kubectl apply -f information/information-deployment.yaml
-# kubectl apply -f payment/payment-deployment.yaml
+# Check if the RabbitMQ cluster is running
+# kubectl get all -l app.kubernetes.io/name=rabbitmq-cluster
 
-echo "Despliegues aplicados con éxito."
+# Do a port forward to access the RabbitMQ management console using localhost:15672
+kubectl port-forward -n rabbitmq-system pod/rabbit-server-0 8080:15672
+# or
+# kubectl port-forward -n rabbitmq-system rabbit-server-0 8080:15672
+
+# Get the username
+RABBITMQ_USERNAME=$(kubectl -n rabbitmq-system get secret rabbit-default-user -o jsonpath="{.data.username}" | base64 --decode)
+# Get the password
+RABBITMQ_PASSWORD=$(kubectl -n rabbitmq-system get secret rabbit-default-user -o jsonpath="{.data.password}" | base64 --decode)
+
+echo "Username: $RABBITMQ_USERNAME"
+echo "Password: $RABBITMQ_PASSWORD"
+
+kubectl apply -f order/order-deployment.yaml
+# kubectl delete deployment order-deployment
+kubectl apply -f stock/stock-deployment.yaml
+# kubectl delete deployment stock-deployment
+kubectl apply -f information/information-deployment.yaml
+# kubectl delete deployment information-deployment
+kubectl apply -f payment/payment-deployment.yaml
+# kubectl delete deployment payment-deployment
